@@ -2,16 +2,16 @@
 name = "py-edge-driver"
 version = "0.1.0"
 description = "An Edge Agent driver library for Factory+."
-authors = [
-    {name = "KavanPrice",email = "kavanprice@gmail.com"}
-]
-license = {text = "MIT"}
+authors = [{ name = "KavanPrice", email = "kavanprice@gmail.com" }]
+license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-]
+dependencies = ["paho-mqtt (>=2.1.0,<3.0.0)"]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+
