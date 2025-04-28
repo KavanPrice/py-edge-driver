@@ -6,7 +6,7 @@ authors = [{ name = "KavanPrice", email = "kavanprice@gmail.com" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["paho-mqtt (>=2.1.0,<3.0.0)"]
+dependencies = ["paho-mqtt (>=2.1.0,<3.0.0)", "asyncio (>=3.4.3,<4.0.0)"]
 
 
 [build-system]

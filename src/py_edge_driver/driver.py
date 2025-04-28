@@ -1,8 +1,11 @@
 import logging
 import json
 from typing import Dict, Any, Optional, Callable, Type, Mapping, Set, Tuple, List
-from .debug import Debug
 import paho.mqtt.client as mqtt # type: ignore
+import asyncio
+
+from .debug import Debug
+from .handler_protocol import HandlerProtocol
 
 class Driver:
     def __init__(self, opts: Dict[str, Any]):
@@ -14,7 +17,7 @@ class Driver:
                 - handler: Handler class for device-specific logic
                 - env: Environment configuration
         """
-        self.HandlerClass = opts.get('handler')
+        self.HandlerClass: Type[HandlerProtocol] | None = opts.get('handler')
 
         self.status = "DOWN"
         self.clear_addrs()
@@ -86,8 +89,39 @@ class Driver:
 
         return client
 
-    def setup_handler(self, conf: dict) -> None:
-        return
+    def setup_handler(self, conf: Optional[dict] = None) -> bool:
+        if not conf:
+            return False
+
+        if not self.HandlerClass:
+            return False
+
+        self.handler = self.HandlerClass.create(self, conf)
+
+        valid = getattr(self.handler.__class__, 'validAddrs', None)
+        parse = getattr(self.handler, 'parseAddr', lambda a: a)
+
+        def handle_addrs(addrs):
+                entries = list(addrs.items())
+
+                if valid:
+                    bad_entries = [(t, a) for t, a in entries if a not in valid]
+                    if bad_entries:
+                        self.log(f"Invalid addresses: {bad_entries}")
+                        return False
+
+                parsed_entries = [(t, parse(a)) for t, a in entries]
+
+                bad_addresses = [addrs[t] for t, s in parsed_entries if not s]
+                if bad_addresses:
+                    self.log(f"Invalid addresses: {bad_addresses}")
+                    return False
+
+                return parsed_entries
+
+        self.handle_addrs = handle_addrs
+
+        return True
 
     def set_status(self, status: str) -> None:
         return
