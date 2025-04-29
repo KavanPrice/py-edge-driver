@@ -34,7 +34,7 @@ class Driver:
         self.mqtt_host, self.mqtt_port = self.get_mqtt_details(env.get("EDGE_MQTT"))
         self.mqtt = self.create_mqtt_client(env.get("EDGE_PASSWORD"))
 
-        self.message_handlers: Dict[str, Callable[[str], None]] = {}
+        self.message_handlers: Dict[str, Callable] = {}
         self.setup_message_handlers()
 
         self.reconnect = 5000
@@ -294,24 +294,103 @@ class Driver:
 
         self.set_status("READY")
 
-    def handle_message(self) -> None:
-        """Handle incoming MQTT messages."""
-        self.log("Handling message")
+    def handle_message(self, client, userdata, message) -> None:
+        """
+        Handle incoming MQTT messages.
 
-    def message(self, msg: str, handler: Callable[[str], None]) -> None:
+        This method is called by the MQTT client when a message is received.
+        It extracts the message parts from the topic, finds the appropriate
+        handler, and invokes it with the payload and optional data parameter.
+
+        Args:
+            client: The MQTT client instance
+            userdata: User data as set in Client() or user_data_set()
+            message: An object containing topic and payload
+        """
+        topic = message.topic
+        payload = message.payload
+
+        topic_parts = topic.split("/")
+        if len(topic_parts) < 3:
+            self.log(f"Invalid topic format: {topic}")
+            return
+
+        msg = topic_parts[2]
+        data = topic_parts[3] if len(topic_parts) > 3 else None
+
+        # If the message is a command, add a trailing slash to make sure that
+        # we get the correct handler.
+        handler_key = msg
+        if msg == "cmd":
+            handler_key = msg + "/#"
+
+        handler = self.message_handlers.get(handler_key)
+        if not handler:
+            self.log(f"Unhandled driver message: {msg}")
+            return
+
+        try:
+            if isinstance(payload, bytes):
+                payload = payload.decode('utf-8')
+            handler(payload, data)
+        except Exception as e:
+            self.log(f"Error handling message {msg}: {e}")
+
+    def message(self, msg: str, handler: Callable) -> None:
         """
         Register a handler function for a specific message.
 
         Args:
             msg: The message identifier to associate with the handler
-            handler: A callback function that accepts a string parameter and returns None,
-                    which will be called when the specified message is received
+            handler: A callback function that will be called when the specified
+                    message is received
         """
         self.message_handlers[msg] = handler
 
     def setup_message_handlers(self) -> None:
         """Set up handlers for different message types."""
-        return
+        def active_handler(payload, _=None):
+            if str(payload) == "ONLINE":
+                self.set_status("READY")
+
+        def conf_handler(payload, _=None):
+            conf = self.json(payload)
+            self.log(f"CONF: {conf}")
+
+            self.clear_addrs()
+            old = getattr(self, 'handler', None)
+
+            if self.setup_handler(conf):
+                if old and hasattr(old, 'close'):
+                    self._run_async(self._handle_close(old))
+                else:
+                    self._run_async(self.connect_handler())
+            else:
+                self.log("Handler rejected driver configuration!")
+                self.set_status("CONF")
+
+        def addr_handler(payload, _=None):
+            addr_config = self.json(payload)
+            if not addr_config:
+                self.set_status("ADDR")
+                return
+
+            async def process_addrs():
+                if not await self.set_addrs(addr_config):
+                    self.set_status("ADDR")
+
+            self._run_async(process_addrs())
+
+        def cmd_handler(payload, command_name=None):
+            if hasattr(self, 'handler') and hasattr(self.handler, 'cmd'):
+                self.handler.cmd(command_name, payload)
+            else:
+                self.log(f"Command handler for '{command_name}' does not exist.")
+
+        self.message("active", active_handler)
+        self.message("conf", conf_handler)
+        self.message("addr", addr_handler)
+        self.message("cmd/#", cmd_handler)
 
     def get_mqtt_details(self, broker: str) -> Tuple[str, int]:
         """
@@ -341,3 +420,30 @@ class Driver:
         task = self.loop.create_task(coro)
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
+
+    async def _handle_close(self, old_handler):
+        """Handle closing the old handler and connect the new one."""
+        close_method = old_handler.close
+
+        # Support both Promise and callback APIs
+        result = None
+        close_event = asyncio.Event()
+
+        # Callback for when close is complete
+        def on_close():
+            close_event.set()
+
+        # Call the close method with our callback
+        result = close_method(on_close)
+
+        # If it returned a result, it might be awaitable
+        if result is not None:
+            if hasattr(result, '__await__'):
+                await result
+            close_event.set()
+        else:
+            # Wait for the callback to be called
+            await close_event.wait()
+
+        # Now connect the new handler
+        await self.connect_handler()

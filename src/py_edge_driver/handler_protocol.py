@@ -52,6 +52,15 @@ class HandlerProtocol(Protocol):
         """
         ...
 
+    def cmd(self, command_name: Any, payload: Any) -> None:
+        """
+        Call a command on the southbound device.
+
+        Args:
+            command_name: Name of the command to execute. To be parsed by the handler.
+            payload: Payload for the command to use. To be parsed by the handler.
+        """
+
     @classmethod
     def create(cls, driver: 'Driver', conf: Dict[str, Any]) -> Optional['HandlerProtocol']:
         """
