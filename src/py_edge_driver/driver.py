@@ -97,7 +97,6 @@ class Driver:
             the driver.
         """
         client = mqtt.Client(
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
             client_id=self.id,
             reconnect_on_failure=False,
         )
@@ -180,11 +179,11 @@ class Driver:
         if status != "UP":
             self._run_async(self.reconnect_handler())
 
-        self.subscribe()
+        self._run_async(self.subscribe())
 
     def conn_up(self) -> None:
         self.set_status("UP")
-        self.subscribe()
+        self._run_async(self.subscribe())
 
     def conn_failed(self) -> None:
         self.set_status("CONN")
@@ -208,14 +207,81 @@ class Driver:
 
     def clear_addrs(self) -> None:
         """Reset device addresses and topics to an empty state."""
-        self.addrs = set()
-        self.topics = set()
+        self.addrs = {}
+        self.topics = {}
 
-    def set_addrs(self, pkt: dict) -> None:
-        return
+    async def set_addrs(self, pkt: dict) -> bool:
+        """
+        Set device addresses from a configuration packet.
 
-    def subscribe(self) -> None:
-        return
+        Args:
+            pkt: Configuration packet with version and address mapping
+
+        Returns:
+            True if addresses were successfully set, False otherwise
+        """
+        if not self.handler:
+            self.log("Received addrs without handler")
+            return False
+
+        self.clear_addrs()
+
+        if pkt.get("version") != 1:
+            self.log(f"Bad ddr config version: {pkt.get('version')}")
+            return False
+
+        parsed = self.handle_addrs(pkt.get("addrs", {}))
+        if not parsed:
+            return False
+
+        self.addrs = dict(parsed)
+        self.topics = {addr: topic for topic, addr in parsed}
+        self.log(f"Set addrs: {self.addrs}")
+
+        self._run_async(self.subscribe())
+
+        return True
+
+    async def subscribe(self) -> bool:
+        """
+        Subscribe the handler to the configured addresses.
+
+        This method checks if the handler is in UP status and has configured
+        addresses, then calls the handler's subscribe method if available.
+
+        Returns:
+            True if subscription was successful, False otherwise
+        """
+        if not self.handler:
+            return False
+
+        if self.status != "UP":
+            self.log("Handler not UP")
+            return False
+
+        if not self.addrs:
+            self.log("Addresses not configured or none available")
+            return False
+
+        specs = list(self.addrs.values())
+
+        subscribe_method = getattr(self.handler, "subscribe", None)
+        if subscribe_method:
+            try:
+                result = subscribe_method(specs)
+                if hasattr(result, "__await__"):
+                    success = await result
+                else:
+                    success = result
+
+                if not success:
+                    self.log("Handler subscription failed")
+                    return False
+            except Exception as e:
+                self.log(f"Handler subscription error: {e}")
+                return False
+
+        return True
 
     async def connected(self) -> None:
         """Subscribe to topics and set ready status."""
