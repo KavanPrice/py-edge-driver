@@ -5,7 +5,7 @@ This module defines the protocol (interface) that all device handlers must imple
 Handlers are responsible for the device-specific logic and communication details.
 """
 
-from typing import Protocol, ClassVar, Optional, Set, Any, Dict, Callable
+from typing import Protocol, ClassVar, Optional, Set, Any, Dict, Callable, Union, Awaitable
 from .driver import Driver
 
 class HandlerProtocol(Protocol):
@@ -40,6 +40,15 @@ class HandlerProtocol(Protocol):
 
         Returns:
             An optional result that may be used by the driver
+        """
+        ...
+
+    def connect(self) -> Union[Awaitable[str], None]:
+        """
+        Connect to the southbound device.
+
+        Returns:
+            A string representing the connection status or None if using callbacks.
         """
         ...
 
