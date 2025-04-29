@@ -124,19 +124,24 @@ class Driver:
         return True
 
     def set_status(self, status: str) -> None:
-        return
+        self.status = status
+        if self.mqtt.is_connected:
+            self.mqtt.publish(self.topic("status"), status)
 
     def connect_handler(self) -> None:
         return
 
     def conn_up(self) -> None:
-        return
+        self.set_status("UP")
+        self.subscribe()
 
     def conn_failed(self) -> None:
-        return
+        self.set_status("CONN")
+        self.reconnect_handler()
 
     def conn_unauth(self) -> None:
-        return
+        self.set_status("AUTH")
+        self.reconnect_handler()
 
     def reconnect_handler(self) -> None:
         return
@@ -149,7 +154,7 @@ class Driver:
     def set_addrs(self, pkt: dict) -> None:
         return
 
-    def subscribe(self, specs: List[Any]) -> None:
+    def subscribe(self) -> None:
         return
 
     def connected(self) -> None:
