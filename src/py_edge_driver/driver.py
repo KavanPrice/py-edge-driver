@@ -108,6 +108,20 @@ class Driver:
         return client
 
     def setup_handler(self, conf: Optional[dict] = None) -> bool:
+        """
+        Set up a new device handler based on the provided configuration.
+
+        This method creates a new handler instance using the configured HandlerClass
+        and initializes address handling functionality. It extracts the address
+        validation and parsing logic from the handler and creates a helper function
+        to process address configurations.
+
+        Args:
+            conf: Configuration dictionary for the handler
+
+        Returns:
+            True if the handler was successfully set up, False otherwise
+        """
         if not conf:
             return False
 
@@ -142,6 +156,15 @@ class Driver:
         return True
 
     def set_status(self, status: str) -> None:
+        """
+        Set the driver's status and publish it via MQTT.
+
+        This method updates the internal status property and, if connected to
+        the MQTT broker, publishes the status to the appropriate topic.
+
+        Args:
+            status: The new status string to set
+        """
         self.status = status
         if self.mqtt.is_connected:
             self.mqtt.publish(self.topic("status"), status)
@@ -182,18 +205,33 @@ class Driver:
         self._run_async(self.subscribe())
 
     def conn_up(self) -> None:
+        """
+        Set the handler status to UP.
+        Used by the handler to notify the driver.
+        """
         self.set_status("UP")
         self._run_async(self.subscribe())
 
     def conn_failed(self) -> None:
+        """
+        Set the handler status to CONN.
+        Used by the handler to notify the driver.
+        """
         self.set_status("CONN")
         self._run_async(self.reconnect_handler())
 
     def conn_unauth(self) -> None:
+        """
+        Set the handler status to AUTH.
+        Used by the handler to notify the driver.
+        """
         self.set_status("AUTH")
         self._run_async(self.reconnect_handler())
 
     async def reconnect_handler(self) -> None:
+        """
+        Attempt to reconnect the handler to the southbound device.
+        """
         if self.reconnecting:
             self.log("Handler already reconnecting")
             return
@@ -382,7 +420,7 @@ class Driver:
             self._run_async(process_addrs())
 
         def cmd_handler(payload, command_name=None):
-            if hasattr(self, 'handler') and hasattr(self.handler, 'cmd'):
+            if hasattr(self, 'handler') and hasattr(self.handler, 'cmd') and self.handler:
                 self.handler.cmd(command_name, payload)
             else:
                 self.log(f"Command handler for '{command_name}' does not exist.")
