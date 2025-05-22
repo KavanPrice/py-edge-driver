@@ -5,8 +5,9 @@ This module defines the protocol (interface) that all device handlers must imple
 Handlers are responsible for the device-specific logic and communication details.
 """
 
-from typing import Protocol, ClassVar, Optional, Set, Any, Dict, Callable, Union, Awaitable
-from .driver import Driver
+from typing import TYPE_CHECKING, Protocol, ClassVar, Optional, Set, Any, Dict, Callable, Union, Awaitable
+if TYPE_CHECKING:
+    from .driver import Driver
 
 class HandlerProtocol(Protocol):
     """
