@@ -2,6 +2,7 @@ import logging
 import json
 from typing import Dict, Any, Optional, Callable, Type, Mapping, Set, Tuple, List
 import paho.mqtt.client as mqtt # type: ignore
+from paho.mqtt.enums import CallbackAPIVersion
 import asyncio
 
 from .debug import Debug
@@ -99,6 +100,7 @@ class Driver:
         client = mqtt.Client(
             client_id=self.id,
             reconnect_on_failure=False,
+            callback_api_version=CallbackAPIVersion.VERSION2,
         )
         client.username_pw_set(self.id, password)
         client.on_connect = self.connected
@@ -321,7 +323,7 @@ class Driver:
 
         return True
 
-    async def connected(self) -> None:
+    def connected(self, *args, **kwargs) -> None:
         """Subscribe to topics and set ready status."""
         topics = [(self.topic(t), 0) for t in self.message_handlers.keys()]
 
