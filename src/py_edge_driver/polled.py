@@ -28,7 +28,7 @@ class PolledDriver(Driver):
         # For serial mode, we need a queue
         if self.serial_mode:
             self.poll_queue = asyncio.Queue(maxsize=Q_MAX)
-            self.queue_processor_task = None
+            self.queue_processor_task: Optional[asyncio.Task] = None
 
     def create_poller(self) -> Callable:
         """
@@ -187,6 +187,7 @@ class PolledDriver(Driver):
                 poll_result = self.handler.poll(spec)
 
                 # Handle both sync and async poll methods
+                buf: Any = None
                 if hasattr(poll_result, '__await__'):
                     buf = await poll_result
                 else:
@@ -207,7 +208,7 @@ class PolledDriver(Driver):
     async def _async_cleanup(self):
         """Override cleanup to handle queue processor task."""
         # Cancel queue processor if running
-        if self.queue_processor_task and not self.queue_processor_task.done():
+        if self.queue_processor_task is not None and not self.queue_processor_task.done():
             self.queue_processor_task.cancel()
             try:
                 await self.queue_processor_task
