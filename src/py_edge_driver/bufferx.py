@@ -57,3 +57,25 @@ def fromDoubleBE(value) -> bytes:
 
 def fromJSON(value) -> bytes:
     return json.dumps(value).encode('utf-8')
+
+__all__ = [
+    'fromInt8',
+    'fromUInt8',
+    'fromInt16LE',
+    'fromInt16BE',
+    'fromUInt16LE',
+    'fromUInt16BE',
+    'fromInt32LE',
+    'fromInt32BE',
+    'fromUInt32LE',
+    'fromUInt32BE',
+    'fromBigInt64LE',
+    'fromBigInt64BE',
+    'fromBigUInt64LE',
+    'fromBigUInt64BE',
+    'fromFloatLE',
+    'fromFloatBE',
+    'fromDoubleLE',
+    'fromDoubleBE',
+    'fromJSON',
+]
