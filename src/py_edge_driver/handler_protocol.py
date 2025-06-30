@@ -75,3 +75,18 @@ class HandlerProtocol(Protocol):
             A new handler instance, or None if creation failed
         """
         ...
+
+    def poll(self, spec: Any) -> Union[Any, Awaitable[Any]]:
+        """
+        Poll data from the southbound device for the given specification.
+
+        This method is optional and only required for handlers used with PolledDriver.
+
+        Args:
+            spec: The parsed address specification to poll data from
+
+        Returns:
+            The polled data (can be bytes, string, or any serializable data),
+            or an awaitable that resolves to the data. Returns None if no data available.
+        """
+        ...
